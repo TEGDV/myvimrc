@@ -1,4 +1,4 @@
- "Neovim general settings
+"Neovim general settings
 
 syntax enable 
 set hidden
@@ -35,6 +35,7 @@ set clipboard=unnamed
 set showmatch
 set showcmd
 let mapleader=" " " Set leaderkey
+filetype plugin indent on
 
 "Pluggins
 
@@ -42,6 +43,7 @@ call plug#begin('~/.vim/plugged')
 
 " Themes
 Plug 'dikiaap/minimalist'
+Plug 'sonph/onehalf', { 'rtp': 'vim' }
 
 " IDE
 Plug 'easymotion/vim-easymotion'
@@ -59,6 +61,10 @@ Plug 'sheerun/vim-polyglot'
 Plug 'leafgarland/typescript-vim'
 Plug 'ianks/vim-tsx'
 Plug 'prettier/vim-prettier', { 'do': 'yarn install'}
+Plug 'yaegassy/coc-htmldjango', {'do': 'yarn install --frozen-lockfile'}
+Plug 'rust-lang/rust.vim'
+Plug 'voldikss/vim-floaterm'
+Plug 'vim-syntastic/syntastic'
 
  "CoC
 Plug 'neoclide/coc.nvim',{'branch':'release'}
@@ -76,11 +82,20 @@ let g:coc_global_extensions = ['coc-actions',
 							  \'coc-prettier',
 							  \'coc-jedi',
 							  \'coc-snippets',
+							  \'coc-rust-analyzer',
 							  \'coc-yaml',]
 
 call plug#end()
 
+colorscheme onehalfdark
+
+let g:airline_theme='onehalfdark'
+" lightline
+let g:lightline = { 'colorscheme': 'onehalfdark' }
+
 " Shortcuts
+
+nmap <Leader>l :FloatermNew<CR>
 
  "Save and quit
 nmap <Leader>w :w<CR>
@@ -95,7 +110,7 @@ map <C-p> +P
 vnoremap > >gv
 vnoremap < <gv
 " Rename
-nmap <F2> <Plug>(coc-rename)
+nmap <Leader>rn <Plug>(coc-rename)
 " Remap keys for gotos
 nmap <silent> gd <Plug>(coc-definition)
 nmap <silent> gy <Plug>(coc-type-definition)
@@ -126,16 +141,11 @@ let g:NERDTreeColorMapCustom = {
 	\ "Clean"     : "#87939A",   
 	\ "Ignored"   : "#808080"   
 	\ }
-colorscheme minimalist
 
-" Formater
-let g:prettier#quickfix_enabled = 0
-let g:prettier#quickfix_auto_focus = 0
  "prettier command for coc
 command! -nargs=0 Prettier :CocCommand prettier.formatFile
-"run prettier on save
-let g:prettier#autoformat = 0
-autocmd BufWritePre *.js,*.jsx,*.mjs,*.ts,*.tsx,*.css,*.less,*.scss,*.json,*.graphql,*.md,*.vue,*.yaml,*.html PrettierAsync
+
+
 " File finder shortcuts
 let g:fzf_action = {
 	    \ 'ctrl-t': 'tab split',
@@ -144,19 +154,32 @@ let g:fzf_action = {
 	    \}
 
 " Use tab for trigger completion with characters ahead and navigate.
+" NOTE: There's always complete item selected by default, you may want to enable
+" no select by `"suggest.noselect": true` in your configuration file.
 " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
 " other plugin before putting this into your config.
 inoremap <silent><expr> <TAB>
-	    \ pumvisible() ? "\<C-n>" :
-	    \ <SID>check_back_space() ? "\<TAB>" :
-	    \ coc#refresh()
-inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+      \ coc#pum#visible() ? coc#pum#next(1) :
+      \ CheckBackspace() ? "\<Tab>" :
+      \ coc#refresh()
+inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
 
-function! s:check_back_space() abort
-    let col = col('.') - 1
-    return !col || getline('.')[col - 1]  =~# '\s'
+" Make <CR> to accept selected completion item or notify coc.nvim to format
+" <C-g>u breaks current undo, please make your own choice.
+inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
+                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+
+function! CheckBackspace() abort
+  let col = col('.') - 1
+  return !col || getline('.')[col - 1]  =~# '\s'
 endfunction
 
+" Use <c-space> to trigger completion.
+if has('nvim')
+  inoremap <silent><expr> <c-space> coc#refresh()
+else
+  inoremap <silent><expr> <c-@> coc#refresh()
+endif
 " Use K to show documentation in preview window.
 nnoremap <silent>` :call <SID>show_documentation()<CR>
 
@@ -166,10 +189,37 @@ function! s:show_documentation()
     elseif (coc#rpc#ready())
 	call CocActionAsync('doHover')
     else
-	execute '!' . &keywordprg . " " . expand('<cword>')
+execute '!' . &keywordprg . " " . expand('<cword>')
     endif
 endfunction
-" Make <CR> auto-select the first completion item and notify coc.nvim to
-" format on enter, <cr> could be remapped by other vim plugin
-inoremap <silent><expr> <cr> pumvisible() ? coc#_select_confirm()
-	    \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+
+" Formatting selected code.
+xmap <leader>f  <Plug>(coc-format-selected)
+nmap <leader>f  <Plug>(coc-format-selected)
+
+" Hover
+nmap <silent> t :<C-U>call CocAction('doHover')<CR>
+
+let g:prettier#config#print_width = 144
+
+" number of spaces per indentation level: a number or 'auto' (use
+" softtabstop)
+" default: 'auto'
+let g:prettier#config#tab_width = 2
+let g:coc_filetype_map = {
+  \ 'htmldjango': 'html',
+  \ }
+
+hi CocFloating ctermbg=237
+hi PmenuSbar ctermbg=250
+
+" Linting Syntastic
+set statusline+=%#warningmsg#
+set statusline+=%{SyntasticStatuslineFlag()}
+set statusline+=%*
+
+let g:syntastic_always_populate_loc_list = 0
+let g:syntastic_auto_loc_list = 0
+let g:syntastic_check_on_open = 0
+let g:rustfmt_autosave = 1
+let g:syntastic_check_on_wq = 0
